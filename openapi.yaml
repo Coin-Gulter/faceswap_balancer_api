@@ -1,0 +1,272 @@
+openapi: '3.0.3'
+
+info:
+  title: Balancer API
+  version: "1.0.0"
+
+servers:
+  - url: '{ env: SERVER_IP }:{ env: SERVER_PORT }'
+
+paths:
+  /face_swap/:
+    post:
+      summary: Create face swap process
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                template_id:
+                  type: integer
+                faceFrom:
+                  type: array
+                  example: ["image_base64"]
+                faceTo:
+                  type: array
+                  example: ["image_base64"]
+      responses:
+        '200':
+          description: Successful face swap request processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id: 
+                    type: string
+
+        '404':
+          description: Error processing user request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  status:
+                    type: string
+
+
+
+  /face_swap/result:
+    get:
+      summary: Get face swap process status
+      parameters:
+        - name: request_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful retrieval of face swap process status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  input:
+                    type: object
+                    description: Information about the request that generated the result
+                    properties:
+                      template_id:
+                        type: integer
+                        description: ID of the template (video/image) to use to swap faces on him (e.g., 18). Template must be preuploaded, you can do it using POST template/add/ request which will return you number of template to insert here.
+                        example: 18
+                        
+                      decoded_image:
+                        type: string
+                        description: Path to the decoded images that you send as "faceFrom" and "faceTo" on server.
+                        example: path to
+                        
+                      watermark:
+                        type: boolean
+                        description: Applied watermark on result
+                        example: true
+                        default: true
+                        
+                      new:
+                        type: boolean
+                        description: Indicates if its a new user
+                        example: true
+                        default: true
+                        
+                      is_image:
+                        type: boolean
+                        description: Indicates if the input tepmlate was an image
+                        example: true
+                        default: true
+                        
+                  status:
+                    type: string
+                    description: Current status of the task. Could be "in_queue" if its in wait in queue, "in_work" if working on it now in progress, "done" if its completely done and "canceled by (some error)" if get error while trying.
+                    example: "in_work"
+                    
+                  output:
+                    type: object
+                    description: Information about the output
+                    properties:
+                    
+                      template_id:
+                        type: integer
+                        description: ID of the input template
+                        example: 18
+                        
+                      premium:
+                        type: boolean
+                        description: Indicates if the task was processed as premium
+                        example: true
+                        
+                      source:
+                        type: string
+                        description: Path to the resulted output fileon server which you can use to download output file. You can download through cdn by adding (your_cdn_domen_where_you_upload + this_source_file_path)
+                        example: path to
+                  
+        '500':
+          description: Error processing user request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  status:
+                    type: string
+
+
+
+  /delete_redis_key:
+    get:
+      summary: Delete information by Redis key
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful deletion of information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+        '500':
+          description: Error processing request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+
+
+
+  /template/add/:
+    post:
+      summary: Upload template
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                thumb:
+                  type: string
+                  format: binary
+                file:
+                  type: string
+                  format: binary
+                preview_source:
+                  type: string
+                  format: binary
+                premium: 
+                  type: string
+                  example: 0 or 1
+                categories:
+                  type: string
+                  example: 0 2 5 7 1  (just a  number of categories by space)
+      responses:
+        '200':
+          description: Successful template upload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Current status of the task. If it goes good return status "in_queue_get_face" which means that images of unique faces from video start extraxting.
+                    example: "in_queue_get_face"
+                  request_id:
+                    type: integer
+                    description: ID of the uploaded template whick you can use next in /faceswap/
+                    example: 18
+        '500':
+          description: Error processing request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+  /face_get/result:
+    get:
+      summary: Get face swap process status by template ID
+      parameters:
+        - name: template_id
+          in: query
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Successful retrieval of face swap process status
+          content:
+            application/json:
+              type: object
+        '500':
+          description: Error processing user request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  status:
+                    type: string
+  /check/faces/:
+    post:
+      summary: Detect face in image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Face detection results
+          content:
+            application/json:
+              oneOf:
+                - type: string
+                - type: object
+        '500':
+          description: Error processing request
